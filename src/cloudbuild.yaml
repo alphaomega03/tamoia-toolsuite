@@ -1,0 +1,50 @@
+steps:
+  # Build the container image
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-t",
+        "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_IMAGE_REPO}/${_IMAGE}:latest",
+        ".",
+        "-f",
+        "nodejs-containers/basic-express/Dockerfile",
+      ]
+    # https://stackoverflow.com/questions/56605865/cloud-build-not-able-to-find-the-dockerfile
+    # https://cloud.google.com/artifact-registry/docs/docker/names
+    # https://cloud.google.com/build/docs/configuring-builds/substitute-variable-values#using_default_substitutions
+  # Push the container image to Container Registry
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "push",
+        "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_IMAGE_REPO}/${_IMAGE}:latest",
+      ]
+  # Deploy container image to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      [
+        "run",
+        "deploy",
+        "${_SERVICE}",
+        "--image",
+        "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_IMAGE_REPO}/${_IMAGE}:latest",
+        "--region",
+        "${_REGION}",
+      ]
+options:
+  logging: CLOUD_LOGGING_ONLY
+  # Don't need to store logs in storage buckets - https://cloud.google.com/build/docs/securing-builds/store-manage-build-logs#store-logs
+substitutions:
+  _IMAGE_REPO: nodejs-containers
+  _IMAGE: basic-express-container
+  _SERVICE: basic-express-microservice
+  _REGION: us-east4
+  # https://cloud.google.com/build/docs/configuring-builds/substitute-variable-values#using_user-defined_substitutions
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_IMAGE_REPO}/${_IMAGE}:latest
+# https://cloud.google.com/build/docs/building/build-containers#store-images
+# "If you want to store the image as part of your build flow and want to display the image in the build results, use both the Docker push command and the images field in your build config file."
+
+# https://cloud.google.com/build/docs/deploying-builds/deploy-cloud-run
