@@ -23,6 +23,7 @@
         "produces": [
           "application/json"
         ],
+        "operationId": "hello",
         "responses": {
           "200": {
             "description": "This works!"

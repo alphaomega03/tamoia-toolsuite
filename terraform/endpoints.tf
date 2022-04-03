@@ -27,12 +27,20 @@ resource "google_project_service" "api-project-service" {
 # Create/update Cloud Run service
 resource "google_cloud_run_service" "endpoints-cloud-run" {
   name     = "endpoints-${var.suffix}"
-  location = var.region
+  location = "us-east1"
   project = var.project_id
+  traffic {
+    percent         = 100
+    latest_revision = true
+  }
+    # https://github.com/Lioric/go-cloud/blob/0a3580612654e801b29df8d786d64f53da227867/samples/guestbook/gcp/main.tf
+  autogenerate_revision_name = true
+  # https://github.com/hashicorp/terraform-provider-google/issues/9438#issuecomment-871946786
+  
   template {
     spec {
       containers {
-        image = "gcr.io/endpoints-release/endpoints-runtime-serverless:2"
+        image = "us-east1-docker.pkg.dev/tamoia-toolsuite-prototype/nodejs-containers/basic-express-container"
         env {
           name  = "ENDPOINTS_SERVICE_NAME"
           value = local.endpoints_host

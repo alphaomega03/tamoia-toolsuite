@@ -8,7 +8,6 @@ const PORT = process.env.PORT || 8080;
 // process.env.<?> references an environment variable and can be configured in tf code for the cloud run resource (search for env block in doc) - https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/cloud_run_service
 
 const app = express();
-const uuid = v4();
 // https://www.npmjs.com/package/uuid
 
 app.get("/hello", (req, res) => {
