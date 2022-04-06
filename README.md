@@ -1,0 +1,1 @@
+For local docker testing use the bash script provided, the only parameters you'll need to provide are the tag and the express route you want to test (in this case it's "/hello", check server.js for clarification)
