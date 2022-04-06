@@ -40,10 +40,13 @@ resource "google_cloud_run_service" "endpoints-cloud-run" {
   template {
     spec {
       containers {
-        image = "us-east1-docker.pkg.dev/tamoia-toolsuite-prototype/nodejs-containers/basic-express-container"
+        image = "us-east1-docker.pkg.dev/tamoia-toolsuite-prototype/nodejs-containers/basic-express-container:latest"
         env {
           name  = "ENDPOINTS_SERVICE_NAME"
           value = local.endpoints_host
+        }
+        ports {
+          container_port = 8080
         }
       }
     }

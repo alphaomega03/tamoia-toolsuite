@@ -19,7 +19,7 @@ DOCKERFILE_PATH=Dockerfile.local
 # https://nodejs.org/en/docs/guides/nodejs-docker-webapp/#creating-a-dockerfile
 
 # building container image
-docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$ARTIFACT_REGISTRY_REPO_NAME/$IMAGE_NAME:latest . -f ${DOCKERFILE_PATH}
+docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$ARTIFACT_REGISTRY_REPO_NAME/$IMAGE_NAME:latest . -f ${DOCKERFILE_PATH} --platform linux/amd64
 
 # pushing container image
 docker push $REGION-docker.pkg.dev/$PROJECT_ID/$ARTIFACT_REGISTRY_REPO_NAME/$IMAGE_NAME:latest

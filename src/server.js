@@ -1,4 +1,13 @@
 const express = require("express");
+const axios = require("axios"); 
+const SUPPORTED_FIAT = require('./consts.js').SUPPORTED_FIAT
+const COIN_API_KEY = require('./consts.js').COIN_API_KEY
+const COIN_API_BASE_URL = require('./consts.js').COIN_API_BASE_URL
+const AXIOS_CONFIG = {
+  headers: {
+    'X-CoinAPI-Key': COIN_API_KEY
+  }
+}
 
 const HOST = "0.0.0.0";
 const PORT = process.env.PORT || 8080;
@@ -11,7 +20,21 @@ const app = express();
 // https://www.npmjs.com/package/uuid
 
 app.get("/hello", (req, res) => {
-  res.send(`Hello Dan!`);
+  res.send('Hello Dan!')
+});
+
+app.get("/fiatExchangeRates/ETH", async (req, res) => {
+
+  const ans = await axios.get(`${COIN_API_BASE_URL}/exchangerate/ETH?invert=false&filter_asset_id=${SUPPORTED_FIAT.toString()}`, AXIOS_CONFIG)
+  console.log(ans, ans.data)  
+  res.send(ans.data);
+});
+
+app.get("/exchangeRate", async (req, res) => {
+  const response = await axios.get(`${COIN_API_BASE_URL}/exchangerate/${req.query.base}/${req.query.quote}`, AXIOS_CONFIG)
+  const { src_side_base, ...restObject } = response.data
+
+  res.send(restObject);
 });
 
 app.listen(PORT, HOST);

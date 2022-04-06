@@ -30,6 +30,34 @@
           }
         }
       }
+    },
+    "/fiatExchangeRate/ETH": {
+      "get": {
+        "description": "Returns a list of fiat exchange rates for ETH",
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "fiatExchangeRate",
+        "responses": {
+          "200": {
+            "description": "Returns a list of fiat exchange rates for ETH"
+          }
+        }
+      }
+    },
+    "/exchangeRate": {
+      "get": {
+        "description": "Returns exchange rate for given base and quote pair",
+        "produces": [
+          "application/json"
+        ],
+        "operationId": "exchangeRate",
+        "responses": {
+          "200": {
+            "description": "Returns exchange rate for given base and quote pair"
+          }
+        }
+      }
     }
   }
 }
