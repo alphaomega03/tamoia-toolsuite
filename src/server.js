@@ -32,7 +32,7 @@ app.get("/fiatExchangeRates/ETH", async (req, res) => {
 
 app.get("/exchangeRate", async (req, res) => {
   const response = await axios.get(`${COIN_API_BASE_URL}/exchangerate/${req.query.base}/${req.query.quote}`, AXIOS_CONFIG)
-  const { src_side_base, ...restObject } = response.data
+  const { src_side_base, src_side_quote, ...restObject } = response.data
 
   res.send(restObject);
 });
