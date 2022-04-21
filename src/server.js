@@ -3,6 +3,7 @@ const axios = require("axios");
 const SUPPORTED_FIAT = require('./consts.js').SUPPORTED_FIAT
 const COIN_API_KEY = require('./consts.js').COIN_API_KEY
 const COIN_API_BASE_URL = require('./consts.js').COIN_API_BASE_URL
+const getUuid = require('uuid-by-string')
 const AXIOS_CONFIG = {
   headers: {
     'X-CoinAPI-Key': COIN_API_KEY
@@ -26,16 +27,48 @@ app.get("/hello", (req, res) => {
 app.get("/fiatExchangeRates/ETH", async (req, res) => {
 
   const ans = await axios.get(`${COIN_API_BASE_URL}/exchangerate/ETH?invert=false&filter_asset_id=${SUPPORTED_FIAT.toString()}`, AXIOS_CONFIG)
-  console.log(ans, ans.data)  
-  res.send(ans.data);
+  const dayta = {
+    AssetIdBase: ans.data.asset_id_base,
+    Rates: ans.data.rates.map((d) => {
+      return {
+        ExternalId: getUuid(`${ans.data.asset_id_base}-${d.asset_id_quote}`),
+        TimeStamp: d.time,
+        AssetIdQuote: d.asset_id_quote,
+        Rate: d.rate,
+        DisplayUrl: `/exchangeRate?base=${ans.data.asset_id_base}&quote=${d.asset_id_quote}`
+      }
+    })
+  }
+  res.send(dayta);
 });
 
 app.get("/exchangeRate", async (req, res) => {
   const response = await axios.get(`${COIN_API_BASE_URL}/exchangerate/${req.query.base}/${req.query.quote}`, AXIOS_CONFIG)
   const { src_side_base, src_side_quote, ...restObject } = response.data
+  
+  const obj = {
+    ExternalId: getUuid(`${restObject.asset_id_base}-${restObject.asset_id_quote}`),
+    Timestamp: restObject.time,
+    AssetIdBase: restObject.asset_id_base,
+    AssetIdQuote: restObject.asset_id_quote
+  }
 
-  res.send(restObject);
+  res.send(obj);
 });
+
+
+const cyrb53 = function(str, seed = 0) {
+  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0, ch; i < str.length; i++) {
+      ch = str.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1>>>16), 2246822507) ^ Math.imul(h2 ^ (h2>>>13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2>>>16), 2246822507) ^ Math.imul(h1 ^ (h1>>>13), 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1>>>0);
+}
+
 
 app.listen(PORT, HOST);
 console.log(`Running on http://${HOST}:${PORT}`);
