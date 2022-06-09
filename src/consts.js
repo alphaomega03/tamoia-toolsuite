@@ -221,8 +221,16 @@ const SUPPORTED_FIAT = [
 
 const COIN_API_KEY = '9C54B2CA-D45E-4592-858C-851FF5DDC8A7'
 const COIN_API_BASE_URL = 'https://rest.coinapi.io/v1'
+
+const OPEN_SEA_API_BASE_URL = 'https://api.opensea.io/api'
+const OPEN_SEA_API_KEY = '28fbebb50f2942b686b48522a76eb9bd'
+
+const CLOUD_FUNCTIONS_BASE_URL = 'https://us-central1-master-plateau-347914.cloudfunctions.net'
 module.exports = {
   SUPPORTED_FIAT, 
   COIN_API_KEY,
-  COIN_API_BASE_URL
+  COIN_API_BASE_URL,
+  OPEN_SEA_API_BASE_URL,
+  OPEN_SEA_API_KEY,
+  CLOUD_FUNCTIONS_BASE_URL
 }

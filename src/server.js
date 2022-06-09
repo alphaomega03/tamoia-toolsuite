@@ -1,32 +1,407 @@
 const express = require("express");
+const bodyParser = require('body-parser');
 const axios = require("axios"); 
-const SUPPORTED_FIAT = require('./consts.js').SUPPORTED_FIAT
-const COIN_API_KEY = require('./consts.js').COIN_API_KEY
-const COIN_API_BASE_URL = require('./consts.js').COIN_API_BASE_URL
 const getUuid = require('uuid-by-string')
-const AXIOS_CONFIG = {
-  headers: {
-    'X-CoinAPI-Key': COIN_API_KEY
-  }
-}
+const Moralis = require("moralis/node");
+const {
+  WALLET_NFT_DATA,
+  WALLET_TRANSACTION_REPORT,
+  WALLET_VALIDATE_NFT_OWNERSHIP,
+  NFT_SEARCH,
+  NFT_COLLECTION_METADATA,
+  NFT_SALES_HISTORY
+} = require('./mockData')
+const { getExchangeRate, getFiatExchangeRate, getEthToUsdAtTime, getEthToUsd, getBaseCollectionInfo, getCollectionSalesStats, triggerTradesMigration } = require('./requests')
+const { initializeApp, applicationDefault, cert } = require('firebase-admin/app')
+const admin = require('firebase-admin')
+require('firebase/firestore')
+const { getFirestore, Timestamp, FieldValue } = require('firebase-admin/firestore')
+const Web3 = require('web3')
+
+require('dotenv').config()
+
+const { connection } = require('./database/dao/tokenBalancesDao')
+const { GET_BALANCES_QUERY } = require('./database/queries/tokenBalances')
+const { GET_SALES_HISTORY_QUERY } = require('./database/queries/salesHistory')
+const { TRACK_NEW_COLLECTION, GET_IS_COLLECTION_TRACKED, CREATE_TRADES_TABLE_FOR_COLLECTION } = require('./database/queries/trackedCollections')
+const moment = require('moment');
+const { response } = require("express");
+const { sortBy } = require('lodash')
+
 
 const HOST = "0.0.0.0";
 const PORT = process.env.PORT || 8080;
-// node.js doc (https://cloud.google.com/run/docs/reference/container-contract#port) set port to 8080 instead of 3000 like in express.js doc (https://expressjs.com/en/starter/hello-world.html), cloud run doc (https://cloud.google.com/run/docs/reference/container-contract#port) also say port must be 8080
-// also calling this file server.js as per node.js doc (https://nodejs.org/en/docs/guides/nodejs-docker-webapp/), express doc calls it app.js, changed this in the package.json as well
-// "The environment variables defined in the container runtime contract are reserved and cannot be set. In particular, the PORT environment variable is injected inside your container by Cloud Run. You should not set it yourself." - https://cloud.google.com/run/docs/configuring/environment-variables - got port declaration and initialization line from https://cloud.google.com/run/docs/quickstarts/build-and-deploy/nodejs
-// process.env.<?> references an environment variable and can be configured in tf code for the cloud run resource (search for env block in doc) - https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/cloud_run_service
 
 const app = express();
-// https://www.npmjs.com/package/uuid
+app.use(bodyParser.json());
+const router = express.Router()
 
-app.get("/hello", (req, res) => {
-  res.send('Hello Dan!')
+initializeApp({
+  credential: applicationDefault()
 });
 
-app.get("/fiatExchangeRates/ETH", async (req, res) => {
+const db = getFirestore();
 
-  const ans = await axios.get(`${COIN_API_BASE_URL}/exchangerate/ETH?invert=false&filter_asset_id=${SUPPORTED_FIAT.toString()}`, AXIOS_CONFIG)
+const web3 = new Web3('https://rpc.flashbots.net/')
+app.get("/hello", (req, res) => {
+  res.send('Hello Dan!')
+})
+
+router.get("/hello", (req, res) => {
+  res.send('Hello Dan!!')
+});
+app.use('/v1', router)
+
+
+app.get("/Wallet/:walletAddress", (req, res) => {
+  const walletAddress = req.params.walletAddress
+  res.send(WALLET_NFT_DATA)
+})
+
+router.get("/Wallet/:walletAddress", (req, res) => {
+  const walletAddress = req.params.walletAddress
+
+  connection.query(GET_BALANCES_QUERY(walletAddress), (err, results, fields) => {
+    console.log('err', err)
+    console.log('results', results)
+
+  const response = {
+      EtherBalance: 0,
+      TokenBalances: [],
+      NFTBalances: WALLET_NFT_DATA
+    }
+
+    res.send(response)
+  })
+})
+
+app.get("/Wallet/:walletAddress/transactionReport", (req, res) => {
+  const walletAddress = req.params.walletAddress
+  res.send(WALLET_TRANSACTION_REPORT)
+})
+
+router.get("/Wallet/:walletAddress/transactionReport", (req, res) => {
+  const walletAddress = req.params.walletAddress
+  res.send(WALLET_TRANSACTION_REPORT)
+})
+
+app.get("/Wallet/:walletAddress/validateNFTOwnership", (req, res) => {
+  const walletAddress = req.params.walletAddress
+  const contractAddress = req.query.contractAddress
+  res.send(WALLET_VALIDATE_NFT_OWNERSHIP)
+})
+
+router.get("/Wallet/:walletAddress/validateNFTOwnership", (req, res) => {
+  const walletAddress = req.params.walletAddress
+  const contractAddress = req.query.contractAddress
+  res.send(WALLET_VALIDATE_NFT_OWNERSHIP)
+})
+
+app.get("/NFT/:contractAddress", async (req, res) => {
+  const contractAddress = req.params.contractAddress
+  const cursor = req.query.cursor || null
+  const limit = req.query.limit && req.query.limit <= 500 ? req.query.limit : 500
+
+  /* Moralis init code */
+  const serverUrl = "https://rixvtkrckpme.usemoralis.com:2053/server"
+  const appId = "IeJkMdrfKDhEFUgeVI2Gkwa7FMle5YQQ4e0wG5eC"
+  const masterKey = "SQ6WO3dvVQZL8H7tFuShnLJC7Jrj2xWevwPPNbQK"
+  let dayta = []
+
+  await Moralis.start({ serverUrl, appId, masterKey });
+
+  const options = { address: contractAddress, chain: "eth", cursor: cursor, limit, format: 'decimal'};
+  NFTs = await Moralis.Web3API.token.getAllTokenIds(options)
+  dayta.push(NFTs.result)
+  const nextCursor = NFTs.cursor
+
+  const filteredData = [].concat.apply([], dayta).map((data) => {
+    return {
+      ExternalId: getUuid(`${contractAddress}`),
+      DisplayUrl: `/NFT/${contractAddress}/${data.token_id}`,
+      BlockNumberMinted: data.block_number_minted,
+      ContractType: data.contract_type,
+      ContractName: data.name,
+      ContractSymbol: data.symbol,
+      TokenId: data.token_id,
+      TokenUri: data.token_uri,
+      LastModified: data.synced_at
+    }
+  })
+
+  res.send({ Result: filteredData, Cursor: nextCursor })
+})
+
+router.get("/NFT/:contractAddress", async (req, res) => {
+  const contractAddress = req.params.contractAddress
+  const cursor = req.query.cursor || null
+  const limit = req.query.limit && req.query.limit <= 100 ? req.query.limit : 100
+
+  /* Moralis init code */
+  const serverUrl = "https://rixvtkrckpme.usemoralis.com:2053/server"
+  const appId = "IeJkMdrfKDhEFUgeVI2Gkwa7FMle5YQQ4e0wG5eC"
+  const masterKey = "SQ6WO3dvVQZL8H7tFuShnLJC7Jrj2xWevwPPNbQK"
+  let dayta = []
+
+  await Moralis.start({ serverUrl, appId, masterKey });
+
+  const options = { address: contractAddress, chain: "eth", cursor: cursor, limit, format: 'decimal'};
+  NFTs = await Moralis.Web3API.token.getAllTokenIds(options)
+  dayta.push(NFTs.result)
+  const nextCursor = NFTs.cursor
+
+  const filteredData = [].concat.apply([], dayta).map((data) => {
+    return {
+      ExternalId: getUuid(`${contractAddress}-${data.token_id}`),
+      DisplayUrl: `/NFT/${contractAddress}/${data.token_id}`,
+      BlockNumberMinted: data.block_number_minted,
+      ContractType: data.contract_type,
+      ContractName: data.name,
+      ContractSymbol: data.symbol,
+      ContractAddress: contractAddress,
+      TokenId: data.token_id,
+      TokenUri: data.token_uri,
+      LastModified: data.synced_at
+    }
+  })
+
+  res.send({ Result: filteredData, Cursor: nextCursor })
+})
+
+app.get('/NFT/:contractAddress/:tokenId', async (req, res) => {
+  const tokenId = req.params.tokenId
+  const contractAddress = req.params.contractAddress
+
+  const serverUrl = "https://rixvtkrckpme.usemoralis.com:2053/server";
+  const appId = "IeJkMdrfKDhEFUgeVI2Gkwa7FMle5YQQ4e0wG5eC";
+  const masterKey = "SQ6WO3dvVQZL8H7tFuShnLJC7Jrj2xWevwPPNbQK";
+
+  await Moralis.start({ serverUrl, appId, masterKey });
+
+  const options = { address: contractAddress, token_id: tokenId, chain: "eth" };
+  const data = await Moralis.Web3API.token.getTokenIdMetadata(options);
+
+  const formattedTokenMetadata =  {
+    ExternalId: getUuid(`${contractAddress}-${tokenId}`),
+    BlockNumberMinted: data.block_number_minted,
+    Owner: data.owner_of,
+    TokenId: data.token_id,
+    TokenUri: data.token_uri,
+    Metadata: data.metadata,
+    LastModified: data.synced_at
+  }
+
+  res.send(formattedTokenMetadata)
+})
+
+
+router.get('/NFT/:contractAddress/:tokenId', async (req, res) => {
+  const tokenId = req.params.tokenId
+  const contractAddress = req.params.contractAddress
+
+  const serverUrl = "https://rixvtkrckpme.usemoralis.com:2053/server";
+  const appId = "IeJkMdrfKDhEFUgeVI2Gkwa7FMle5YQQ4e0wG5eC";
+  const masterKey = "SQ6WO3dvVQZL8H7tFuShnLJC7Jrj2xWevwPPNbQK";
+
+  await Moralis.start({ serverUrl, appId, masterKey });
+
+  const options = { address: contractAddress, token_id: tokenId, chain: "eth" };
+  const data = await Moralis.Web3API.token.getTokenIdMetadata(options);
+
+  const formattedTokenMetadata =  {
+    ExternalId: getUuid(`${contractAddress}-${tokenId}`),
+    BlockNumberMinted: data.block_number_minted,
+    Owner: data.owner_of,
+    TokenId: data.token_id,
+    ContractAddress: contractAddress,
+    TokenUri: data.token_uri,
+    Metadata: data.metadata,
+    LastModified: data.synced_at
+  }
+
+  res.send(formattedTokenMetadata)
+})
+
+router.post('/NFTs/:contractAddress/', async (req, res) => {
+  const tokenIds = req.body.TokenIds || []
+  const contractAddress = req.params.contractAddress
+
+  const serverUrl = "https://rixvtkrckpme.usemoralis.com:2053/server";
+  const appId = "IeJkMdrfKDhEFUgeVI2Gkwa7FMle5YQQ4e0wG5eC";
+  const masterKey = "SQ6WO3dvVQZL8H7tFuShnLJC7Jrj2xWevwPPNbQK";
+
+  await Moralis.start({ serverUrl, appId, masterKey });
+
+  let response = []
+
+  for(let i = 0; i < tokenIds.length; i++) {
+    const options = { address: contractAddress, token_id: tokenIds[i], chain: "eth" };
+    const data = await Moralis.Web3API.token.getTokenIdMetadata(options);
+  
+    const formattedTokenMetadata =  {
+      ExternalId: getUuid(`${contractAddress}-${tokenIds[i]}`),
+      BlockNumberMinted: data.block_number_minted,
+      Owner: data.owner_of,
+      TokenId: data.token_id,
+      ContractAddress: contractAddress,
+      TokenUri: data.token_uri,
+      Metadata: data.metadata,
+      LastModified: data.synced_at
+    }
+
+    response.push(formattedTokenMetadata)
+  }
+
+
+
+  res.send(sortBy(response, (token) => token.TokenId))
+})
+
+app.get("/NFT/:contractAddress/:tokenId/salesHistory", (req, res) => {
+  const contractAddress = req.params.contractAddress
+  const tokenId = req.params.tokenId
+
+  res.send(NFT_SALES_HISTORY)
+})
+
+const delay = ms => new Promise(res => setTimeout(res, ms))
+
+router.get("/NFT/:contractAddress/:tokenId/salesHistory", async (req, res) => {
+  const contractAddress = req.params.contractAddress
+  const tokenId = parseInt(req.params.tokenId).toString(16).padStart(64, 0)
+
+  connection.query(GET_SALES_HISTORY_QUERY(tokenId, contractAddress), async (err, results) => {
+    const response = []
+
+    const dollarValue = await getEthToUsd().then((price) => {
+      return price.data.rate
+    })
+
+    console.log('results', results)
+    console.log('err', err)    
+
+    if(results) {
+      for(let i = 0; i < results.length; i++) {
+        const etherValue = web3.utils.fromWei(results[i].price.toString())
+  
+        response.push({
+          FromAddress: results[i].from_address,
+          ToAddress: results[i].to_address,
+          TransactionHash: results[i].transaction_hash,
+          TransactionDate: results[i].block_timestamp,
+          TransactionPriceUSD: dollarValue,
+          TransactionPrice: etherValue,
+          TransactionCurrency: "ETH",
+          DisplayURL: `/NFT/${contractAddress}/${req.params.tokenId}`
+        })
+      }
+    }
+    res.send(response)
+  })
+})
+
+
+app.get("/NFTCollection/:contractAddress", (req, res) => {
+  const contractAddress = req.params.contractAddress
+  res.send(NFT_COLLECTION_METADATA)
+})
+
+router.get("/NFTCollection/:contractAddress", async (req, res) => {
+  const contractAddress = req.params.contractAddress
+  const collectionInfoRes = await getBaseCollectionInfo(contractAddress)
+
+  const baseCollectionInfo = collectionInfoRes.data.collection
+  const collectionSlug = baseCollectionInfo.slug
+
+  const collectionStatsRes = await getCollectionSalesStats(collectionSlug)
+
+  const collectionStats = collectionStatsRes.data.stats
+
+  const response = {
+    ExternalId: getUuid(contractAddress),
+    CollectionName: baseCollectionInfo.name,
+    Description: baseCollectionInfo.description,
+    ContractAddress: contractAddress,
+    CryptoCurrency: 'ETH',
+    FloorPrice: collectionStats.floor_price,
+    NinetyDayAverageSalePrice: collectionStats.thirty_day_average_price,
+    NinetyDayVolumeTraded: collectionStats.thirty_day_volume,
+    TotalVolumeTraded: collectionStats.total_volume,
+    LastSaleDate: "2022-04-26T16:56:55.600Z",
+    DisplayURL: `/NFT/${contractAddress}`
+  }
+
+  res.send(response)
+})
+
+router.post("/NFTCollections", async (req, res) => {
+  const contractAddresses = req.body.ContractAddresses || []
+
+  let response = []
+
+  for(let i = 0; i < contractAddresses.length; i++) {
+      const collectionInfoRes = await getBaseCollectionInfo(contractAddresses[i])
+
+      const baseCollectionInfo = collectionInfoRes.data.collection
+      const collectionSlug = baseCollectionInfo.slug
+
+      const collectionStatsRes = await getCollectionSalesStats(collectionSlug)
+
+      const collectionStats = collectionStatsRes.data.stats
+
+      const data = {
+          ExternalId: getUuid(contractAddresses[i]),
+          CollectionName: baseCollectionInfo.name,
+          Description: baseCollectionInfo.description,
+          ContractAddress: contractAddresses[i],
+          CryptoCurrency: 'ETH',
+          FloorPrice: collectionStats.floor_price,
+          NinetyDayAverageSalePrice: collectionStats.thirty_day_average_price,
+          NinetyDayVolumeTraded: collectionStats.thirty_day_volume,
+          TotalVolumeTraded: collectionStats.total_volume,
+          LastSaleDate: "2022-04-26T16:56:55.600Z",
+          DisplayURL: `/NFT/${contractAddresses[i]}`
+      }
+
+      response.push(data)
+
+      await delay(250)
+  }
+
+  res.send(sortBy(response, (contract) => contract.CollectionName))
+})
+
+app.post("/NFTCollection/search", (req, res) => {
+  const searchQuery = req.body.Query
+  const limit = req.body.Limit || 500
+  res.send(NFT_SEARCH)
+})
+
+router.post("/NFTCollection/search", (req, res) => {
+  const searchQuery = req.body.Query
+  const limit = req.body.Limit || 500
+  res.send(NFT_SEARCH)
+})
+
+app.get("/fiatExchangeRates/ETH", async (req, res) => {
+  const ans = await getFiatExchangeRate()
+  const dayta = {
+    AssetIdBase: ans.data.asset_id_base,
+    Rates: ans.data.rates.map((d) => {
+      return {
+        ExternalId: getUuid(`${ans.data.asset_id_base}-${d.asset_id_quote}`),
+        TimeStamp: d.time,
+        AssetIdQuote: d.asset_id_quote,
+        Rate: d.rate,
+        DisplayUrl: `/exchangeRate?base=${ans.data.asset_id_base}&quote=${d.asset_id_quote}`
+      }
+    })
+  }
+  res.send(dayta);
+});
+
+router.get("/fiatExchangeRates/ETH", async (req, res) => {
+  const ans = await getFiatExchangeRate()
   const dayta = {
     AssetIdBase: ans.data.asset_id_base,
     Rates: ans.data.rates.map((d) => {
@@ -43,7 +418,21 @@ app.get("/fiatExchangeRates/ETH", async (req, res) => {
 });
 
 app.get("/exchangeRate", async (req, res) => {
-  const response = await axios.get(`${COIN_API_BASE_URL}/exchangerate/${req.query.base}/${req.query.quote}`, AXIOS_CONFIG)
+  const response = await getExchangeRate(req.query.base, req.query.quote)
+  const { src_side_base, src_side_quote, ...restObject } = response.data
+  
+  const obj = {
+    ExternalId: getUuid(`${restObject.asset_id_base}-${restObject.asset_id_quote}`),
+    Timestamp: restObject.time,
+    AssetIdBase: restObject.asset_id_base,
+    AssetIdQuote: restObject.asset_id_quote
+  }
+
+  res.send(obj);
+});
+
+router.get("/exchangeRate", async (req, res) => {
+  const response = await getExchangeRate(req.query.base, req.query.quote)
   const { src_side_base, src_side_quote, ...restObject } = response.data
   
   const obj = {
@@ -57,17 +446,133 @@ app.get("/exchangeRate", async (req, res) => {
 });
 
 
-const cyrb53 = function(str, seed = 0) {
-  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
-  for (let i = 0, ch; i < str.length; i++) {
-      ch = str.charCodeAt(i);
-      h1 = Math.imul(h1 ^ ch, 2654435761);
-      h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1>>>16), 2246822507) ^ Math.imul(h2 ^ (h2>>>13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2>>>16), 2246822507) ^ Math.imul(h1 ^ (h1>>>13), 3266489909);
-  return 4294967296 * (2097151 & h2) + (h1>>>0);
+const updateAppDb = async (contractAddress, userId, res) => {
+  await connection.query(GET_IS_COLLECTION_TRACKED(contractAddress), async (err, res) => {
+    if(err) {
+      res.status(400)
+      res.send({
+        error: `Error while checking if collection ${contractAddress} is already in tracked_collections table in MySQL:  ${err}`
+      })
+    }
+    const isCollectionAlreadyTracked = res[0]['is_collection_tracked'] === 1 ? true : false
+    console.log('isColelction', isCollectionAlreadyTracked)
+
+    if(!isCollectionAlreadyTracked) {
+      await connection.query(TRACK_NEW_COLLECTION(contractAddress, userId), (err) => {
+        if(err) {
+          res.status(400)
+          res.send({
+            error: `Error adding collection ${contractAddress} to tracked_collections table in MySQL: ${err}`
+          })
+        }
+      })
+      await connection.query(CREATE_TRADES_TABLE_FOR_COLLECTION(contractAddress), (err, res) => {
+        if(err) {
+          res.status(400)
+          res.send({
+            error: `Error creating _trades table for collection ${contractAddress} in MySQL: ${err}`
+          })
+        }
+      })
+      triggerTradesMigration(contractAddress).catch((err) => {
+        res.status(400)
+        res.send({
+          error: `Error while triggering migrate-tables cloud function: ${err}`
+        })
+      })
+    }
+  })
 }
+
+router.post('/NFTCollection/track', async (req, res) => {
+  const contractAddress = req.body.ContractAddress && req.body.ContractAddress.toLowerCase()
+  const userId = req.body.UserId
+  const tokenIds = req.body.TokenIds || []
+
+  try {
+    await web3.eth.getCode(contractAddress)
+  } catch(e) {
+    res.status(400)
+    res.send({
+      error: `Collection contract address ${contractAddress} is not a valid contract address`
+    })
+  }
+  
+  const docRef = db.collection('users').doc(userId);
+
+  const docRaw = await docRef.get()
+
+  const doc = docRaw.data()
+
+  const existingTrackedCollections = doc && doc.collections || {}
+
+  if(existingTrackedCollections[contractAddress]) {
+    res.status(400)
+    res.send({
+      error: `User ${userId} is already tracking collection with contract address ${contractAddress}`
+    })
+  }
+
+  const existingTokenIds = (doc && doc.collections && doc.collections[contractAddress] && doc.collections[contractAddress].tokenIds) || []
+
+  const tokenIdsToSave = [...new Set(existingTokenIds.concat(tokenIds))]
+
+  await docRef.update({
+    userId,
+    collections: {
+      ...existingTrackedCollections,
+      [contractAddress]: {
+        tokenIds: tokenIdsToSave
+      }
+    },
+    lastModified: moment().utc()
+  }, { merge: true })
+
+  await updateAppDb(contractAddress, userId, res)
+
+  const response = {
+    UserDisplayUrl: `/NFTCollection/user/${userId}`,
+    CollectionDisplayUrl: `/NFTCollection/${contractAddress}`
+  }
+
+  res.send(response)
+})
+
+router.get('/NFTCollection/user/:userId', async (req, res) => {
+  const userId = req.params.userId
+
+  const docRef = db.collection('users').doc(userId);
+
+  const docRaw = await docRef.get()
+
+  const doc = docRaw.data()
+
+  if(!doc) {
+    res.status(400)
+    res.send({
+      error: `User ${userId} is not currently tracking a collection`
+    })
+  }
+
+  const trackedCollections = Object.keys(doc.collections).map((contractAddress) => {
+
+    const shouldIncludeTokenIds = doc.collections[contractAddress].tokenIds.length !== 0
+
+    if(shouldIncludeTokenIds) {
+      return {
+        ContractAddress: contractAddress,
+        DisplayUrl: `NFTCollection/${contractAddress}`,
+        TokenIds: doc.collections[contractAddress].tokenIds
+      }
+    } else {
+      return {
+        ContractAddress: contractAddress,
+        DisplayUrl: `NFTCollection/${contractAddress}`
+      }
+    }
+  })
+  res.send(trackedCollections)
+})
 
 
 app.listen(PORT, HOST);

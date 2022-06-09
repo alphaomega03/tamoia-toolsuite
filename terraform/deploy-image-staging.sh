@@ -1,14 +1,16 @@
 # setting container image variables
-REGION=us-east1
-PROJECT_ID=tamoia-toolsuite-prototype
-ARTIFACT_REGISTRY_REPO_NAME=nodejs-containers
+REGION=us-central1
+PROJECT_ID=master-plateau-347914
+ARTIFACT_REGISTRY_REPO_NAME=nodejs-containers-staging
 IMAGE_NAME=basic-express-container
+
+terraform init
 
 # only provisioning artifact registry repo and required APIs
 terraform apply -target google_artifact_registry_repository.nodejs-containers --auto-approve
 
 # "Before you can push or pull images, configure Docker to use the gcloud command-line tool to authenticate requests to Artifact Registry."
-gcloud auth configure-docker us-east1-docker.pkg.dev
+gcloud auth configure-docker us-central1-docker.pkg.dev
 # https://cloud.google.com/artifact-registry/docs/docker/quickstart#auth
 
 # building the container image from it's source directory is just easier and not as error prone...

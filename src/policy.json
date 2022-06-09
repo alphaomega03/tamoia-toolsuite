@@ -1,0 +1,52 @@
+{
+  "bindings": [
+    {
+      "members": [
+        "serviceAccount:p366817080796-dzsw2a@gcp-sa-cloud-sql.iam.gserviceaccount.com"
+      ],
+      "role": "projects/master-plateau-347914/roles/CustomRole"
+    },
+    {
+      "members": [
+        "projectEditor:master-plateau-347914",
+        "projectOwner:master-plateau-347914"
+      ],
+      "role": "roles/storage.legacyBucketOwner"
+    },
+    {
+      "members": [
+        "projectViewer:master-plateau-347914",
+        "serviceAccount:p366817080796-dzsw2a@gcp-sa-cloud-sql.iam.gserviceaccount.com"
+      ],
+      "role": "roles/storage.legacyBucketReader"
+    },
+    {
+      "members": [
+        "projectEditor:master-plateau-347914",
+        "projectOwner:master-plateau-347914"
+      ],
+      "role": "roles/storage.legacyObjectOwner"
+    },
+    {
+      "members": [
+        "projectViewer:master-plateau-347914"
+      ],
+      "role": "roles/storage.legacyObjectReader"
+    },
+    {
+      "members": [
+        "projectEditor:master-plateau-347914",
+        "projectOwner:master-plateau-347914",
+        "serviceAccount:p366817080796-dzsw2a@gcp-sa-cloud-sql.iam.gserviceaccount.com"
+      ],
+      "role": "roles/storage.objectAdmin"
+    },
+    {
+      "members": [
+        "serviceAccount:p366817080796-dzsw2a@gcp-sa-cloud-sql.iam.gserviceaccount.com"
+      ],
+      "role": "roles/storage.objectViewer"
+    }
+  ],
+  "etag": "CAk="
+}

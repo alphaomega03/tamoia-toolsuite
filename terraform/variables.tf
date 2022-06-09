@@ -1,8 +1,8 @@
 variable "project_id" {
-  default = "tamoia-toolsuite-prototype"
+  default = "master-plateau-347914"
 }
 variable "project_number" {
-  default = "992583239554"
+  default = "366817080796"
 }
 variable "suffix" {
   default = "prod"
