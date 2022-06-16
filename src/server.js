@@ -11,7 +11,7 @@ const {
   NFT_COLLECTION_METADATA,
   NFT_SALES_HISTORY
 } = require('./mockData')
-const { getExchangeRate, getFiatExchangeRate, getEthToUsdAtTime, getEthToUsd, getBaseCollectionInfo, getTokenInfo, getCollectionSalesStats, triggerTradesMigration } = require('./requests')
+const { getExchangeRate, getFiatExchangeRate, getEthToUsdAtTime, getEthToUsd, getBaseCollectionInfo, getTokenInfo, getCollectionSalesStats, getRarityScoreStats, triggerTradesMigration } = require('./requests')
 const { initializeApp, applicationDefault, cert } = require('firebase-admin/app')
 const admin = require('firebase-admin')
 require('firebase/firestore')
@@ -23,8 +23,8 @@ require('dotenv').config()
 const { connection } = require('./database/dao/tokenBalancesDao')
 const { GET_BALANCES_QUERY } = require('./database/queries/tokenBalances')
 const { GET_SALES_HISTORY_QUERY } = require('./database/queries/salesHistory')
-const { TRACK_NEW_COLLECTION, GET_IS_COLLECTION_TRACKED, CREATE_TRADES_TABLE_FOR_COLLECTION } = require('./database/queries/trackedCollections')
-const { GET_PURCHASE_DATA_FOR_TOKEN } = require('./database/queries/purchaseHistory')
+const { TRACK_NEW_COLLECTION, GET_IS_COLLECTION_TRACKED, CREATE_TRADES_TABLE_FOR_COLLECTION,INSERT_RARITY_SCORES_FOR_COLLECTION } = require('./database/queries/trackedCollections')
+// const { GET_PURCHASE_DATA_FOR_TOKEN } = require('./database/queries/purchaseHistory')
 const moment = require('moment');
 const { response } = require("express");
 const { sortBy } = require('lodash')
@@ -213,6 +213,9 @@ router.get('/NFT/:contractAddress/:tokenId', async (req, res) => {
 
   const result = await getTokenInfo(contractAddress, tokenId)
 
+  const rarityResponse = await getRarityScoreStats(contractAddress)
+  const tokenRarity = rarityResponse.data.data.find(row => row.id === parseInt(tokenId)).score
+  
   const formattedTokenMetadata =  {
     ExternalId: getUuid(`${contractAddress}-${tokenId}`),
     BlockNumberMinted: data.block_number_minted,
@@ -222,12 +225,32 @@ router.get('/NFT/:contractAddress/:tokenId', async (req, res) => {
     TokenUri: data.token_uri,
     Metadata: data.metadata,
     LastModified: data.synced_at,
-    PurchaseDate: result.data.last_sale.event_timestamp,
-    PurchasePrice: web3.utils.fromWei(result.data.last_sale.total_price)
+    PurchaseDate: result.data.last_sale && result.data.last_sale.event_timestamp,
+    PurchasePrice: result.data.last_sale && web3.utils.fromWei(result.data.last_sale.total_price),
+    RarityScore: tokenRarity
   }
 
   res.send(formattedTokenMetadata)
 
+})
+
+router.get('/NFT/rarityScore/:contractAddress/:tokenId', async (req, res) => {
+  const tokenId = req.params.tokenId
+  const contractAddress = req.params.contractAddress
+  const rarityResponse = await getRarityScoreStats(contractAddress)
+  const tokenRarity = rarityResponse.data.data.find(row => row.id === parseInt(tokenId))
+  const tokenRarityComposite = tokenRarity.score
+  const tokenRarityTraits = tokenRarity.traits.map(trait => {
+    return { Name: trait.n, Category: trait.c, Rarity: trait.r }
+  })
+  const formattedTokenMetadata =  {
+    ContractAddress: contractAddress,
+    TokenId: tokenId,
+    RarityScore: tokenRarityComposite,
+    RarityTraits: tokenRarityTraits
+  }
+
+  res.send(formattedTokenMetadata)
 })
 
 router.post('/NFTs/:contractAddress/', async (req, res) => {
@@ -455,6 +478,20 @@ router.get("/exchangeRate", async (req, res) => {
 
 
 const updateAppDb = async (contractAddress, userId, res) => {
+  // const rarityResponse = await getRarityScoreStats(contractAddress)
+  // const formattedRarities = rarityResponse.data.data.map(row =>{
+  //     return "(" + `'${contractAddress}',` + row.id + ',' + row.score + ',' + `'${JSON.stringify(row.traits).replace("'", "")}'` + ")"
+  // }).join(", ")
+
+  // await connection.query(INSERT_RARITY_SCORES_FOR_COLLECTION(formattedRarities), (err) => {
+  //   if(err) {
+  //     res.status(400)
+  //     console.log(err)
+  //     res.send({
+  //       error: `Error adding collection ${contractAddress} to rarity_scores table in MySQL: ${err}`
+  //     })
+  //   }
+  // })
   await connection.query(GET_IS_COLLECTION_TRACKED(contractAddress), async (err, res) => {
     if(err) {
       res.status(400)

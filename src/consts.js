@@ -225,6 +225,8 @@ const COIN_API_BASE_URL = 'https://rest.coinapi.io/v1'
 const OPEN_SEA_API_BASE_URL = 'https://api.opensea.io/api'
 const OPEN_SEA_API_KEY = '28fbebb50f2942b686b48522a76eb9bd'
 
+const RARITY_SNIFFER_BASE_URL = 'https://raritysniffer.dev/api/v1/collection'
+
 const CLOUD_FUNCTIONS_BASE_URL = 'https://us-central1-master-plateau-347914.cloudfunctions.net'
 module.exports = {
   SUPPORTED_FIAT, 
@@ -232,5 +234,6 @@ module.exports = {
   COIN_API_BASE_URL,
   OPEN_SEA_API_BASE_URL,
   OPEN_SEA_API_KEY,
+  RARITY_SNIFFER_BASE_URL,
   CLOUD_FUNCTIONS_BASE_URL
 }

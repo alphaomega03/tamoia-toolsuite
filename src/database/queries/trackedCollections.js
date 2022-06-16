@@ -36,8 +36,18 @@ const CREATE_TRADES_TABLE_FOR_COLLECTION = (contractAddress) => {
   )
 }
 
+const INSERT_RARITY_SCORES_FOR_COLLECTION = (allRarities) => {
+  return (
+    `
+      INSERT INTO ethereum.rarity_scores(nft_contract_address, token_id, rarity_score, trait_rarity)
+      VALUES ${allRarities}
+    `
+  )
+}
+
 module.exports = {
   GET_IS_COLLECTION_TRACKED,
   TRACK_NEW_COLLECTION,
-  CREATE_TRADES_TABLE_FOR_COLLECTION
+  CREATE_TRADES_TABLE_FOR_COLLECTION,
+  INSERT_RARITY_SCORES_FOR_COLLECTION
 }

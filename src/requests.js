@@ -1,4 +1,4 @@
-const { COIN_API_BASE_URL, SUPPORTED_FIAT, COIN_API_KEY, OPEN_SEA_API_KEY, OPEN_SEA_API_BASE_URL, CLOUD_FUNCTIONS_BASE_URL } = require('./consts') 
+const { COIN_API_BASE_URL, SUPPORTED_FIAT, COIN_API_KEY, OPEN_SEA_API_KEY, OPEN_SEA_API_BASE_URL, RARITY_SNIFFER_BASE_URL, CLOUD_FUNCTIONS_BASE_URL } = require('./consts') 
 const axios = require('axios')
 const moment = require('moment')
 const { GoogleAuth } = require('google-auth-library')
@@ -44,6 +44,10 @@ const getCollectionSalesStats = (collectionSlug) => {
   return axios.get(`${OPEN_SEA_API_BASE_URL}/v1/collection//${collectionSlug}/stats`, OPEN_SEA_API_AXIOS_CONFIG)
 }
 
+const getRarityScoreStats = (contractAddress) => {
+  return axios.get(`${RARITY_SNIFFER_BASE_URL}?collection=${contractAddress}&taskId=any&norm=true&partial=false&traitCount=true`)
+}
+
 const triggerTradesMigration = async (contractAddress) => {
   console.log('auth', auth)
   const url = `${CLOUD_FUNCTIONS_BASE_URL}/migrate-tables-copy`
@@ -66,5 +70,6 @@ module.exports = {
   getBaseCollectionInfo,
   getTokenInfo,
   getCollectionSalesStats,
+  getRarityScoreStats,
   triggerTradesMigration
 }
