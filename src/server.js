@@ -11,7 +11,7 @@ const {
   NFT_COLLECTION_METADATA,
   NFT_SALES_HISTORY
 } = require('./mockData')
-const { getExchangeRate, getFiatExchangeRate, getEthToUsdAtTime, getEthToUsd, getBaseCollectionInfo, getCollectionSalesStats, triggerTradesMigration } = require('./requests')
+const { getExchangeRate, getFiatExchangeRate, getEthToUsdAtTime, getEthToUsd, getBaseCollectionInfo, getTokenInfo, getCollectionSalesStats, triggerTradesMigration } = require('./requests')
 const { initializeApp, applicationDefault, cert } = require('firebase-admin/app')
 const admin = require('firebase-admin')
 require('firebase/firestore')
@@ -24,6 +24,7 @@ const { connection } = require('./database/dao/tokenBalancesDao')
 const { GET_BALANCES_QUERY } = require('./database/queries/tokenBalances')
 const { GET_SALES_HISTORY_QUERY } = require('./database/queries/salesHistory')
 const { TRACK_NEW_COLLECTION, GET_IS_COLLECTION_TRACKED, CREATE_TRADES_TABLE_FOR_COLLECTION } = require('./database/queries/trackedCollections')
+const { GET_PURCHASE_DATA_FOR_TOKEN } = require('./database/queries/purchaseHistory')
 const moment = require('moment');
 const { response } = require("express");
 const { sortBy } = require('lodash')
@@ -199,6 +200,8 @@ router.get('/NFT/:contractAddress/:tokenId', async (req, res) => {
   const tokenId = req.params.tokenId
   const contractAddress = req.params.contractAddress
 
+  const tokenId64Bits = parseInt(req.params.tokenId).toString(16).padStart(64, 0)
+
   const serverUrl = "https://rixvtkrckpme.usemoralis.com:2053/server";
   const appId = "IeJkMdrfKDhEFUgeVI2Gkwa7FMle5YQQ4e0wG5eC";
   const masterKey = "SQ6WO3dvVQZL8H7tFuShnLJC7Jrj2xWevwPPNbQK";
@@ -208,6 +211,8 @@ router.get('/NFT/:contractAddress/:tokenId', async (req, res) => {
   const options = { address: contractAddress, token_id: tokenId, chain: "eth" };
   const data = await Moralis.Web3API.token.getTokenIdMetadata(options);
 
+  const result = await getTokenInfo(contractAddress, tokenId)
+
   const formattedTokenMetadata =  {
     ExternalId: getUuid(`${contractAddress}-${tokenId}`),
     BlockNumberMinted: data.block_number_minted,
@@ -216,10 +221,13 @@ router.get('/NFT/:contractAddress/:tokenId', async (req, res) => {
     ContractAddress: contractAddress,
     TokenUri: data.token_uri,
     Metadata: data.metadata,
-    LastModified: data.synced_at
+    LastModified: data.synced_at,
+    PurchaseDate: result.data.last_sale.event_timestamp,
+    PurchasePrice: web3.utils.fromWei(result.data.last_sale.total_price)
   }
 
   res.send(formattedTokenMetadata)
+
 })
 
 router.post('/NFTs/:contractAddress/', async (req, res) => {

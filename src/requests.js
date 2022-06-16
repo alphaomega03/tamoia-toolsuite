@@ -36,6 +36,10 @@ const getBaseCollectionInfo = (contractAddress) => {
   return axios.get(`${OPEN_SEA_API_BASE_URL}/v1/asset_contract/${contractAddress}`, OPEN_SEA_API_AXIOS_CONFIG)
 }
 
+const getTokenInfo = (contractAddress, tokenId) => {
+  return axios.get(`${OPEN_SEA_API_BASE_URL}/v1/asset/${contractAddress}/${tokenId}`, OPEN_SEA_API_AXIOS_CONFIG)
+}
+
 const getCollectionSalesStats = (collectionSlug) => {
   return axios.get(`${OPEN_SEA_API_BASE_URL}/v1/collection//${collectionSlug}/stats`, OPEN_SEA_API_AXIOS_CONFIG)
 }
@@ -60,6 +64,7 @@ module.exports = {
   getEthToUsdAtTime,
   getEthToUsd,
   getBaseCollectionInfo,
+  getTokenInfo,
   getCollectionSalesStats,
   triggerTradesMigration
 }
