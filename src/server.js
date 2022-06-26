@@ -365,6 +365,34 @@ router.get("/NFTCollection/:contractAddress", async (req, res) => {
   res.send(response)
 })
 
+app.get('/NFTCollection/isOwner/:contractAddress/:userAddress', async (req, res) => {
+  const userAddress = req.params.userAddress
+  const contractAddress = req.params.contractAddress
+
+  const serverUrl = "https://rixvtkrckpme.usemoralis.com:2053/server";
+  const appId = "IeJkMdrfKDhEFUgeVI2Gkwa7FMle5YQQ4e0wG5eC";
+  const masterKey = "SQ6WO3dvVQZL8H7tFuShnLJC7Jrj2xWevwPPNbQK";
+
+  await Moralis.start({ serverUrl, appId, masterKey });
+
+  const options = { 
+    token_address: contractAddress, 
+    address: userAddress, 
+    chain: "eth" 
+  };
+
+  const data = await Moralis.Web3API.account.getNFTsForContract(options);
+
+  const isOwner = data.total > 0 ? true : false;
+  const formattedTokenMetadata =  {
+    User: userAddress,
+    IsOwner: isOwner,
+    LastModified: data.synced_at
+  }
+
+  res.send(formattedTokenMetadata)
+})
+
 router.post("/NFTCollections", async (req, res) => {
   const contractAddresses = req.body.ContractAddresses || []
 
