@@ -365,7 +365,7 @@ router.get("/NFTCollection/:contractAddress", async (req, res) => {
   res.send(response)
 })
 
-app.get('/NFTCollection/isOwner/:contractAddress/:userAddress', async (req, res) => {
+router.get('/NFTCollection/isOwner/:contractAddress/:userAddress', async (req, res) => {
   const userAddress = req.params.userAddress
   const contractAddress = req.params.contractAddress
 
