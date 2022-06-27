@@ -40,6 +40,10 @@ const getTokenInfo = (contractAddress, tokenId) => {
   return axios.get(`${OPEN_SEA_API_BASE_URL}/v1/asset/${contractAddress}/${tokenId}`, OPEN_SEA_API_AXIOS_CONFIG)
 }
 
+const getSalesHistory = (contractAddress, tokenId) => {
+  return axios.get(`${OPEN_SEA_API_BASE_URL}/v1/events?asset_contract_address=${contractAddress}&token_id=${tokenId}&event_type=successful`, OPEN_SEA_API_AXIOS_CONFIG)
+}
+
 const getCollectionSalesStats = (collectionSlug) => {
   return axios.get(`${OPEN_SEA_API_BASE_URL}/v1/collection//${collectionSlug}/stats`, OPEN_SEA_API_AXIOS_CONFIG)
 }
@@ -71,5 +75,6 @@ module.exports = {
   getTokenInfo,
   getCollectionSalesStats,
   getRarityScoreStats,
-  triggerTradesMigration
+  triggerTradesMigration,
+  getSalesHistory
 }

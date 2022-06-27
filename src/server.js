@@ -11,7 +11,7 @@ const {
   NFT_COLLECTION_METADATA,
   NFT_SALES_HISTORY
 } = require('./mockData')
-const { getExchangeRate, getFiatExchangeRate, getEthToUsdAtTime, getEthToUsd, getBaseCollectionInfo, getTokenInfo, getCollectionSalesStats, getRarityScoreStats, triggerTradesMigration } = require('./requests')
+const { getExchangeRate, getFiatExchangeRate, getEthToUsdAtTime, getEthToUsd, getBaseCollectionInfo, getTokenInfo, getCollectionSalesStats, getRarityScoreStats, triggerTradesMigration, getSalesHistory } = require('./requests')
 const { initializeApp, applicationDefault, cert } = require('firebase-admin/app')
 const admin = require('firebase-admin')
 require('firebase/firestore')
@@ -239,13 +239,21 @@ router.get('/NFT/rarityScore/:contractAddress/:tokenId', async (req, res) => {
   const contractAddress = req.params.contractAddress
   const rarityResponse = await getRarityScoreStats(contractAddress)
   const tokenRarity = rarityResponse.data.data.find(row => row.id === parseInt(tokenId))
+
+  const collectionInfoRes = await getBaseCollectionInfo(contractAddress)
+  const baseCollectionInfo = collectionInfoRes.data.collection
+  const collectionSlug = baseCollectionInfo.slug
+  const collectionStatsRes = await getCollectionSalesStats(collectionSlug)
+  const totalSupply = collectionStatsRes.data.stats.total_supply
+
   const tokenRarityComposite = tokenRarity.score
   const tokenRarityTraits = tokenRarity.traits.map(trait => {
-    return { Name: trait.n, Category: trait.c, Rarity: trait.r }
+    return { Name: trait.n, Category: trait.c, Rarity: trait.r, Occurrences: trait.t, OccurrencesPercentage: (trait.t/totalSupply) * 100 }
   })
   const formattedTokenMetadata =  {
     ContractAddress: contractAddress,
     TokenId: tokenId,
+    RarityRank: tokenRarity.positionId,
     RarityScore: tokenRarityComposite,
     RarityTraits: tokenRarityTraits
   }
@@ -283,8 +291,6 @@ router.post('/NFTs/:contractAddress/', async (req, res) => {
     response.push(formattedTokenMetadata)
   }
 
-
-
   res.send(sortBy(response, (token) => token.TokenId))
 })
 
@@ -299,36 +305,31 @@ const delay = ms => new Promise(res => setTimeout(res, ms))
 
 router.get("/NFT/:contractAddress/:tokenId/salesHistory", async (req, res) => {
   const contractAddress = req.params.contractAddress
-  const tokenId = parseInt(req.params.tokenId).toString(16).padStart(64, 0)
+  const tokenId = req.params.tokenId
 
-  connection.query(GET_SALES_HISTORY_QUERY(tokenId, contractAddress), async (err, results) => {
-    const response = []
+  const salesHistoryRes = await getSalesHistory(contractAddress, tokenId)
+  const salesHistory = salesHistoryRes.data
 
-    const dollarValue = await getEthToUsd().then((price) => {
-      return price.data.rate
-    })
+  const response = salesHistory.asset_events.map((evt) => {
+    const seller = evt.seller
+    const winnerAccount = evt.winner_account
+    const transaction = evt.transaction
+    const etherValue = web3.utils.fromWei(evt.total_price)
+    const paymentToken = evt.payment_token
 
-    console.log('results', results)
-    console.log('err', err)    
 
-    if(results) {
-      for(let i = 0; i < results.length; i++) {
-        const etherValue = web3.utils.fromWei(results[i].price.toString())
-  
-        response.push({
-          FromAddress: results[i].from_address,
-          ToAddress: results[i].to_address,
-          TransactionHash: results[i].transaction_hash,
-          TransactionDate: results[i].block_timestamp,
-          TransactionPriceUSD: dollarValue,
-          TransactionPrice: etherValue,
-          TransactionCurrency: "ETH",
-          DisplayURL: `/NFT/${contractAddress}/${req.params.tokenId}`
-        })
-      }
+    return {
+      FromAddress: seller.address,
+      ToAddress: winnerAccount.address,
+      TransactionHash: transaction.transaction_hash,
+      TransactionDate: transaction.timestamp,
+      TransactionPrice: etherValue,
+      TransactionPriceUSD: paymentToken.usd_price * etherValue,
+      TransactionCurrency: "ETH",
+      DisplayURL: `/NFT/${contractAddress}/${req.params.tokenId}`
     }
-    res.send(response)
   })
+  res.send(response)
 })
 
 
